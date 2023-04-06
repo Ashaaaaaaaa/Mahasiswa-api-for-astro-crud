@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use Hash;
+use Validator;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Hash;
 
 class UserController extends Controller
 {
@@ -14,49 +15,77 @@ class UserController extends Controller
     public function store(Request $request)
     {
 
-        $input = $request->all();
-
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'name'                      =>      'required',
             'email'                     =>      'required|email:dns',
             'password'                  =>      'required|confirmed|min:1',
             'password_confirmation'     =>      'required_with:password|same:password|min:1',
         ]);
 
-        User::create([
-            'name'              => $input['name'],
-            'email'             => $input['email'],
-            'password'          => Hash::make($input['password']),
-            'confirm_password'  => Hash::make($input['confirm_password']),
-        ]);
+        if($validator->fails()){
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Registration Success'
-        ]);
+            return response()->json([
+                'status' => 422,
+                'errors' => $validator->messages()
+            ], 422);
+        }else {
+
+            $input = $request->all();
+
+            $user = User::create([
+                'name'              => $input['name'],
+                'email'             => $input['email'],
+                'password'          => Hash::make($input['password']),
+                'confirm_password'  => Hash::make($input['confirm_password']),
+            ]);
+
+            if($user){
+
+                return response()->json([
+                    'status' => 200,
+                    'message' => "Registration Success"
+                ], 200);
+            }else{
+
+                return response()->json([
+                    'status' => 500,
+                    'message' => "Something Went Wrong!"
+                ], 500);
+            }
+        }
     }
 
     public function check(Request $request)
     {
 
-        $credentials = $request->validate([
+        $validator = Validator::make($request->all(), [
+            
             'email'         => 'required|exists:users,email',
-            'password'      => 'required',
+            'password'      => 'required|confirmed',
         ]);
 
-        if (Auth::attempt($credentials))
-        {
+        $user = $request->only('email', 'password');
+
+        if(Auth::attempt($user)) {
 
             return response()->json([
-                'status' => true,
-                'message' => 'Success'
-            ]);
+                'status' => 200,
+                'message' => "Success Login"
+            ], 200);
+        } elseif($validator->fails()){
+
+            return response()->json([
+                'status' => 422,
+                'errors' => $validator->messages()
+            ], 422);
+        }else{
+
+            return response()->json([
+                'status' => 500,
+                'errors' => "Something Went Wrong"
+            ], 500);
         }
 
-            return response()->json([
-                'status' => false,
-                'message' => 'Fail'
-            ]);
     }
 
     public function logout(){
